@@ -21,6 +21,17 @@ else
   vagrantBox = 'cdaf/WindowsServerStandard'
 end
 
+if Vagrant.has_plugin?("vagrant-reload")
+  puts "has_plugin : vagrant-reload installed"
+else
+  system "vagrant plugin install vagrant-reload"
+  exit
+end
+
+if Vagrant.has_plugin?("vagrant-proxyconf")
+  puts "has_plugin : vagrant-proxyconf installed"
+end
+
 # If this environment variable is set, RAM and CPU allocations for virtual machines are increase by this factor, so must be an integer
 # [Environment]::SetEnvironmentVariable('SCALE_FACTOR', '2', 'Machine')
 if ENV['SCALE_FACTOR']
@@ -28,14 +39,20 @@ if ENV['SCALE_FACTOR']
 else
   scale = 1
 end
+vCPU = scale
+
 if ENV['BASE_MEMORY']
   baseRAM = ENV['BASE_MEMORY'].to_i
 else
   baseRAM = 1024
 end
-
 vRAM = baseRAM * scale
-vCPU = scale
+
+if ENV['BUILD_MEMORY']
+  buildRAM = ENV['BUILD_MEMORY'].to_i
+else
+  buildRAM = 1024
+end
 
 # This is provided to make scaling easier
 MAX_SERVER_TARGETS = 1
@@ -106,7 +123,7 @@ Vagrant.configure(2) do |config|
     # Oracle VirtualBox with private NAT has insecure deployer keys for desktop testing
     build.vm.provider 'virtualbox' do |virtualbox, override|
       virtualbox.name = 'windows-build'
-      virtualbox.memory = "#{vRAM}"
+      virtualbox.memory = "#{buildRAM}"
       virtualbox.cpus = "#{vCPU}"
       virtualbox.gui = false
       override.vm.network 'private_network', ip: '172.16.17.100'
@@ -131,7 +148,7 @@ Vagrant.configure(2) do |config|
     # Microsoft Hyper-V does not support NAT or setting hostname. vagrant up build --provider hyperv
     build.vm.provider 'hyperv' do |hyperv, override|
       hyperv.vmname = "windows-build"
-      hyperv.memory = "#{vRAM}"
+      hyperv.memory = "#{buildRAM}"
       hyperv.cpus = "#{vCPU}"
       hyperv.ip_address_timeout = 300 # 5 minutes, default is 2 minutes (120 seconds)
       override.vm.synced_folder ".", "/vagrant", type: "smb", smb_username: "#{ENV['VAGRANT_SMB_USER']}", smb_password: "#{ENV['VAGRANT_SMB_PASS']}"
